@@ -1,18 +1,16 @@
-from socket import *
+import socket
 
-serverPort = ipp #from ss -t -l on terminal
+HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
+PORT = 65432        # Port to listen on (non-privileged ports are > 1023)
 
-serverSocket = socket(AF_INET,SOCK_STREAM)
-serverSocket.bind((‘’,serverPort))
-serverSocket.listen(1)
-
-print('The server is ready to receive')
-
-while True:
-  connecitonSocket, addr = serverSocket.accept()
-  
-sentence = connectionSocket.recv(1024).decode()
-capitalizedSentence = sentence.upper() 
-connectionSocket.send(capitalizedSentence.encode())
-connectionSocket.close()
-
+with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.bind((HOST, PORT))
+    s.listen()
+    conn, addr = s.accept()
+    with conn:
+        print('Connected by', addr)
+        while True:
+            data = conn.recv(1024)
+            if not data:
+                break
+            conn.sendall(data)
