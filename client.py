@@ -11,7 +11,7 @@ HOST = input('Enter the IP address or Hostname of the server: ')
 
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     s.connect((HOST, PORT))
-    print('Please wait while I connect you...')
+    print('Please wait while I connect you...') #TIMEOUT??
     s.sendall(b'Hello, this is the client')
 
     interactions_expected = 3
@@ -19,12 +19,19 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
 
     while(interactions<interactions_expected):
         data1 = s.recv(1024)
-        if(interactions<interactions_expected-1):
-            interactions+=1
+        if(interactions<2):
             byt = bytes(str(interactions), 'utf-8')
             print('Received', repr(data1), '\n')
-            s.sendall(b'received #' + byt)
-        else:
-            to_send = input('_:')
-            s.sendall(b'' + bytes(to_send))
+            s.sendall(bytes('received #', 'utf-8') + byt)
+            interactions+=1
+        if(interactions==2):
+            while True:
+                to_send = input('_: ')
+                s.sendall(bytes(to_send, 'utf-8'))
+                time.sleep(1)#waiting for cmd response
+                data3 = s.recv(1024)#PONER UN TIMEOUT=> ERR
+                print(repr(data3))
+
+
+
     print('\n Closing socket connection...')
