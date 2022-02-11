@@ -21,7 +21,8 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
     with conn:
         print('Connected by', addr)
         counter = 0
-        while True:
+        out=1
+        while out!=0:
             data = conn.recv(1024)
             print(data)
             if data:
@@ -38,31 +39,39 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                         data2 = conn.recv(1024)
                         msg = data2.decode("utf-8")
                         print(msg)
-                        print(msg[0:2])
+
                         if(msg=='help'):
                             conn.sendall(b'help/get key/put key value/values/keyset/mapping/bye ')
-                        if(msg=='get key'):
+                        if(msg[0:3]=='get'):
                             print('check1')
+                            value=df["key"].iloc[0]
+                            key = msg[4:(len(msg)-1)]
+                            display(df)
+                            conn.sendall(bytes(row_1, 'utf-8'))#NEED TO GET THE value for the KEY
                             pass
                         if(msg[0:3]=='put'):
-                            conn.sendall(b'whatuver')
-                            gap_pos = data2.decode("utf-8").find(" ")
-                            print(gap_pos)
-                            #df.loc[len(df.index)] = [index, 'whatever']
+                            first_gap_pos = msg.find(" ")
+                            second_gap_pos = (msg.find(" "), first_gap_pos+1)
+                            key = msg[4:first_gap_pos]
+                            print(key)
+                            value = msg[(second_gap_pos+1):(len(msg)-1)]
+                            print(value)
+                            df.loc[len(df.index)] = [key, value]
                             display(df)
+                            conn.sendall(b'new df')
                             print('check2')
                             pass
-                        if((data2.decode("utf-8"))=='values'):
+                        if(msg[0:3]=='values'):
                             print('check3')
                             pass
-                        if((data2.decode("utf-8"))=='keyset'):
+                        if(msg[0:3]=='keyset'):
                             print('check4')
                             pass
-                        if((data2.decode("utf-8"))=='mappings'):
+                        if(msg[0:3]=='mappings'):
                             print('check5')
                             pass
-                        if((data.decode("utf-8"))=='bye'):
-                            print('check6')
+                        if(msg[0:3]=='bye'):
+                            out=0
                             break
 
             else:
