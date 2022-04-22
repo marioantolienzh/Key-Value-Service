@@ -3,19 +3,23 @@ import sys
 import struct
 import time
 
-#RETRANSMISSION AND HANDLE DUPLICATED PACKETS
-#IMPLEMENT A THREE WAY HANDSHAKE
-#AFTER THE ESTABLISHMENT, THE CLIENT WILL TERMINATE THE CONNECTION
+##
+# This code was written by Mario Antolínez Herrera on 22/04/2022
+# CSDS 325 TCP-like Protocol over UDP (Project 2)
+# Client-Server Paradigm with characters Alice (Client) and Bob (Server)
+# THIS IS BOB'S CODE
+##
 
 #Static variables
-TIMEOUT = 0.5
+TIMEOUT = 0.5 #in seconds
 BUFFERSIZE = 1024
 MAX_SEQNUM = 30720
 
 ##generatePacket(seqNum, ackNum, window, rest)
-#   This function is used to pack the relevant variables to be sent.
-#The whole packet has 16 bytes and depending on the value of the flags
+# This function is used to pack the relevant variables to be sent.
+# The whole packet has 16 bytes and depending on the value of the flags
 #it will take one value or another as showed in the commented table
+##
 def generatePacket(seqNum, ackNum, window, rest):
     #rest structure
     #|0|0|0|0|0|0|0|0|0|0|0|0|0|A|S|F|
@@ -39,8 +43,9 @@ def generatePacket(seqNum, ackNum, window, rest):
     return packet
 
 ##findValuesAfterCommas(buffer, result_b)
-#   This function is used to extract the data from the raw packet stored in buffer
+# This function is used to extract the data from the raw packet stored in buffer
 #and will store the output result in result_b.
+##
 def findValuesAfterCommas(buffer, result_b):
     #init local variables
     counter = 0
@@ -55,8 +60,9 @@ def findValuesAfterCommas(buffer, result_b):
     return result_b
 
 ##findPortInAddress(address, result_a)
-#   This function is used to extract the data of the client port from the encoded
+# This function is used to extract the data of the client port from the encoded
 #data in address. We will suppose the port # will have 5 digits
+##
 def findPortInAddress(address, result_a):
     for i in range(0, len(address)):
         if(address[i] == ','):
@@ -71,16 +77,18 @@ def findPortInAddress(address, result_a):
     return result_a
 
 ##init(UDPSocket, port)
-#   This function is used to init the UDP Socket, it takes as input a UDPSocket
+# This function is used to init the UDP Socket, it takes as input a UDPSocket
 #object and the port number which it will bind to and listen
+##
 def init(UDPSocket, port):
     UDPSocket.bind(('', port))
     print("UDP server up and listening...")
 
-##listen(bytesAddressPair, UDPSocket, counter, address, seqNum, ackNum, window, rest)
-#   This function is used to listen to the UDP Socket the server binded to.
+##listen(UDPSocket, counter, address, seqNum, ackNum, window, rest)
+# This function is used to listen to the UDP Socket the server binded to.
 #It also unpacks the data inside the packet calling some of the above declarated
 #functions and will output the port of the client who sent the packet to the main program
+##
 def listen(UDPSocket, seqNum, ackNum, window, rest):
     #local variables declaration
     result_a, result_b, address = '', '', ''
@@ -103,9 +111,10 @@ def listen(UDPSocket, seqNum, ackNum, window, rest):
             return int(clientPort) , seqNum, ackNum, window, rest
             break;
 
-##sendPacket(UDPSocket, packet, serverDirections)
-#   This function is used to send packets from the UDP Socket connection.
-#It sends the packet and informs of the sent packet
+##sendPacket(UDPSocket, packet, serverDirections, seqNum, rest, lastWasTiemout)
+# This function is used to send packets from the UDP Socket connection.
+#It sends the packet and informs of the sent packet.
+##
 def sendPacket(UDPSocket, packet, serverDirections, seqNum, rest, lastWasTiemout):
     UDPSocket.sendto(packet, serverDirections)
 
@@ -120,19 +129,22 @@ def sendPacket(UDPSocket, packet, serverDirections, seqNum, rest, lastWasTiemout
         case _:
             synack_notification = ""
 
-
     print("Sending packet [" + str(seqNum) + "] " + lastWasTiemout + synack_notification)
 
 ##main()
-#   This is the main program that will run the execution of the UDP SERVER
+# This is the main program that will run the execution of the UDP SERVER CONNECTION
 #If first creates the UDP Server Socket, and then it enters in the section in which
-#the connection is stablished
+#the connection is stablished following the 3-Way-Handshake
+# **Note that the Server Code must be executed firstly**
+# ***Code uses functions such as "match", which will be only executable with Python Versions newer than Python3.10***
+
+##
 if __name__ == "__main__":
     if len(sys.argv) != 2:
-        sys.exit("Usage: python simple-tcp-server.py [PORT-NUMBER]")
+        sys.exit("Usage: python3 server.py [PORT-NUMBER]")
     serverPort = int(sys.argv[1])
 
-    #initiating local variables
+    #initiating Global variables
     interactions, retransmission, endOfHandshake, lastWasTiemout = 0,0,0,0
     seqNum, ackNum, window, rest = 0,0,0,0
 
@@ -154,6 +166,7 @@ if __name__ == "__main__":
                 else:
                     pass
 
+                #send packet when received, and change the parameters of the package depending on the received values
                 try:
                     clientPort, seqNum, ackNum, window, rest = listen(UDPServerSocket, seqNum, ackNum, window, rest)
                     interactions = interactions + 1
@@ -172,11 +185,14 @@ if __name__ == "__main__":
                         rest = 0
                         endOfHandshake = 1
                         #PROGRAM WOULD STOP HERE
+                    case _:
+                        #THIS WOULD BE OTHER CASES NOT CONSIDERED IN THIS SIMPLE EXECUTION
+                        pass
                 if(endOfHandshake == 1):
                     print("Connection to Alice Succesfully Done")
                     sys.exit(1)
 
-                #THEORETICAL TIMEOUT AFTER RECEIVING SYN
+                #THEORETICAL TIMEOUT AFTER RECEIVING SYN TO CHECK TIMEOUT BEHAVIOR
                 #print("I am sleeping for 2 seconds...")
                 #time.sleep(2)
 
@@ -187,3 +203,4 @@ if __name__ == "__main__":
         else:
             retransmission = 0
             print("Retransmitting packet " + str(seqNum))
+
