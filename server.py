@@ -1,79 +1,189 @@
-import sys
 import socket
+import sys
+import struct
 import time
-import pandas as pd
-from IPython.display import display
 
-HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
-PORT = 65432        # Port to listen on (non-privileged ports are > 1023)
+#RETRANSMISSION AND HANDLE DUPLICATED PACKETS
+#IMPLEMENT A THREE WAY HANDSHAKE
+#AFTER THE ESTABLISHMENT, THE CLIENT WILL TERMINATE THE CONNECTION
 
-df = pd.DataFrame({
-    "Key": ['Key'],
-    "Value": [0]
-})
+#Static variables
+TIMEOUT = 0.5
+BUFFERSIZE = 1024
+MAX_SEQNUM = 30720
 
-display(df)
+##generatePacket(seqNum, ackNum, window, rest)
+#   This function is used to pack the relevant variables to be sent.
+#The whole packet has 16 bytes and depending on the value of the flags
+#it will take one value or another as showed in the commented table
+def generatePacket(seqNum, ackNum, window, rest):
+    #rest structure
+    #|0|0|0|0|0|0|0|0|0|0|0|0|0|A|S|F|
+    #---------------------------------
+    #|A|S|F|dec.|
+    #|0|0|0| 0  |
+    #|0|0|1| 1  |
+    #|0|1|0| 2  |
+    #|0|1|1| 3  |
+    #|1|0|0| 4  |
+    #|1|0|1| 5  |
+    #|1|1|0| 6  |
+    #|1|1|1| 7  |
+    #----------------------------------
+    packet = struct.pack('hhhh',
+            seqNum,          #seqNum
+            ackNum,          #ackNum
+            window,          #window size
+            rest             #16bits that have to be specified
+    )
+    return packet
 
-with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-    s.bind((HOST, PORT))
-    s.listen()
-    conn, addr = s.accept()
-    with conn:
-        print('Connected by', addr)
-        counter = 0
-        out=1
-        while out!=0:
-            data = conn.recv(1024)
-            print(data)
-            if data:
-                if(counter==0):
-                    conn.sendall(b'Welcome to the keyValue Service')
-                    counter+=1
-                if(counter==1):
-                    time.sleep(1)
-                    conn.sendall(b'KeyValue Service> ')
-                    counter+=1
-                if(counter==2):
-                    while True:
-                        time.sleep(1)
-                        data2 = conn.recv(1024)
-                        msg = data2.decode("utf-8")
-                        print(msg)
+##findValuesAfterCommas(buffer, result_b)
+#   This function is used to extract the data from the raw packet stored in buffer
+#and will store the output result in result_b.
+def findValuesAfterCommas(buffer, result_b):
+    #init local variables
+    counter = 0
 
-                        if(msg=='help'):
-                            conn.sendall(b'help/get key/put key value/values/keyset/mapping/bye ')
-                        if(msg[0:3]=='get'):
-                            print('check1')
-                            value=df["key"].iloc[0]
-                            key = msg[4:(len(msg)-1)]
-                            display(df)
-                            conn.sendall(bytes(row_1, 'utf-8'))#NEED TO GET THE value for the KEY
-                            pass
-                        if(msg[0:3]=='put'):
-                            first_gap_pos = msg.find(" ")
-                            second_gap_pos = (msg.find(" "), first_gap_pos+1)
-                            key = msg[4:first_gap_pos]
-                            print(key)
-                            value = msg[(second_gap_pos+1):(len(msg)-1)]
-                            print(value)
-                            df.loc[len(df.index)] = [key, value]
-                            display(df)
-                            conn.sendall(b'new df')
-                            print('check2')
-                            pass
-                        if(msg[0:3]=='values'):
-                            print('check3')
-                            pass
-                        if(msg[0:3]=='keyset'):
-                            print('check4')
-                            pass
-                        if(msg[0:3]=='mappings'):
-                            print('check5')
-                            pass
-                        if(msg[0:3]=='bye'):
-                            out=0
-                            break
+    for i in range(1, len(buffer)):
+        if(buffer[i] == ','):
+            result_b += buffer[i-1]#MIGHT GO FARTHER THAN LENGTH, PUT A WHILE
+            counter = counter + 1
+        if(buffer[i] == ')'):
+            result_b += buffer[i-1]#MIGHT GO FARTHER THAN LENGTH, PUT A WHILE
+            counter = counter + 1
+    return result_b
 
-            else:
-                print('Ending connection')
-                break
+##findPortInAddress(address, result_a)
+#   This function is used to extract the data of the client port from the encoded
+#data in address. We will suppose the port # will have 5 digits
+def findPortInAddress(address, result_a):
+    for i in range(0, len(address)):
+        if(address[i] == ','):
+            try:
+                result_a += address[i + 2]
+                result_a += address[i + 3]
+                result_a += address[i + 4]
+                result_a += address[i + 5]
+                result_a += address[i + 6]
+            except:
+                print("ArrayIndexOutOfBounds Error.")
+    return result_a
+
+##init(UDPSocket, port)
+#   This function is used to init the UDP Socket, it takes as input a UDPSocket
+#object and the port number which it will bind to and listen
+def init(UDPSocket, port):
+    UDPSocket.bind(('', port))
+    print("UDP server up and listening...")
+
+##listen(bytesAddressPair, UDPSocket, counter, address, seqNum, ackNum, window, rest)
+#   This function is used to listen to the UDP Socket the server binded to.
+#It also unpacks the data inside the packet calling some of the above declarated
+#functions and will output the port of the client who sent the packet to the main program
+def listen(UDPSocket, seqNum, ackNum, window, rest):
+    #local variables declaration
+    result_a, result_b, address = '', '', ''
+    #variable that counts the interations with the server
+
+    while(1):
+        bytesAddressPair = UDPSocket.recvfrom(BUFFERSIZE)
+        if(bytesAddressPair):
+            message = bytesAddressPair[0]
+            address = bytesAddressPair[1]
+
+            clientPort = findPortInAddress(str(address), result_a)
+            buffer = struct.unpack('hhhh', message)
+
+            result_b = findValuesAfterCommas(str(buffer), result_b)
+            seqNum, ackNum, window, rest = int(result_b[0]), int(result_b[1]), int(result_b[2]), int(result_b[3])
+            print("Receiving packet [" + str(seqNum) + "]")
+
+            #GET THE VALUES OF FLAGS FROM THE message...[seqNum, ackNum, window, rest] = 0,0,0,0
+            return int(clientPort) , seqNum, ackNum, window, rest
+            break;
+
+##sendPacket(UDPSocket, packet, serverDirections)
+#   This function is used to send packets from the UDP Socket connection.
+#It sends the packet and informs of the sent packet
+def sendPacket(UDPSocket, packet, serverDirections, seqNum, rest, lastWasTiemout):
+    UDPSocket.sendto(packet, serverDirections)
+
+    if(lastWasTiemout==0):
+        lastWasTiemout = ""
+    else:
+        lastWasTiemout = "(Retransmission) "
+
+    match rest:
+        case 6:
+            synack_notification = "(SYN/ACK) "
+        case _:
+            synack_notification = ""
+
+
+    print("Sending packet [" + str(seqNum) + "] " + lastWasTiemout + synack_notification)
+
+##main()
+#   This is the main program that will run the execution of the UDP SERVER
+#If first creates the UDP Server Socket, and then it enters in the section in which
+#the connection is stablished
+if __name__ == "__main__":
+    if len(sys.argv) != 2:
+        sys.exit("Usage: python simple-tcp-server.py [PORT-NUMBER]")
+    serverPort = int(sys.argv[1])
+
+    #initiating local variables
+    interactions, retransmission, endOfHandshake, lastWasTiemout = 0,0,0,0
+    seqNum, ackNum, window, rest = 0,0,0,0
+
+    #init socket
+    try:
+        UDPServerSocket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+        init(UDPServerSocket, serverPort)
+    except:
+        print("There has been an error while managing your UDP connection...")
+        sys.exit(1)
+
+
+    while(True):
+        #CONNECTION STABLISHEMENT COMMUNICATION
+        if(retransmission == 0):
+                #set timeout after first arrival of packet
+                if(interactions == 1):
+                    UDPServerSocket.settimeout(TIMEOUT)
+                else:
+                    pass
+
+                try:
+                    clientPort, seqNum, ackNum, window, rest = listen(UDPServerSocket, seqNum, ackNum, window, rest)
+                    interactions = interactions + 1
+                except TimeoutError:
+                    print("Timeout Error in " + str(seqNum))
+                    retransmission = 1
+                    lastWasTiemout = 1
+                    pass
+                #WILL ONLY CONSIDER TWO CASES: SYN AND ACK
+                match rest:
+                    case 2:
+                        seqNum = seqNum + 1
+                        rest = 6
+                    case 4:
+                        seqNum = seqNum + 1
+                        rest = 0
+                        endOfHandshake = 1
+                        #PROGRAM WOULD STOP HERE
+                if(endOfHandshake == 1):
+                    print("Connection to Alice Succesfully Done")
+                    sys.exit(1)
+
+                #THEORETICAL TIMEOUT AFTER RECEIVING SYN
+                #print("I am sleeping for 2 seconds...")
+                #time.sleep(2)
+
+                syn_packet = generatePacket(seqNum, ackNum, window, rest)
+                sendPacket(UDPServerSocket, syn_packet, ('', clientPort), seqNum, rest, lastWasTiemout)
+                if(lastWasTiemout != 0):
+                    lastWasTiemout = 0
+        else:
+            retransmission = 0
+            print("Retransmitting packet " + str(seqNum))
