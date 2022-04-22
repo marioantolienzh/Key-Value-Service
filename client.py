@@ -3,8 +3,17 @@ import sys
 import struct
 import time
 
+##
+# This code was written by Mario Antolínez Herrera on 22/04/2022
+# CSDS 325 TCP-like Protocol over UDP (Project 2)
+# Client-Server Paradigm with characters Alice (Client) and Bob (Server)
+# THIS IS ALICE'S CODE
+# **Note that the Server Code must be executed firstly**
+# ***Code uses functions such as "match", which will be only executable with Python Versions newer than Python3.10***
+##
+
 #Static Variables
-TIMEOUT = 0.5
+TIMEOUT = 0.5 #in seconds
 BUFFERSIZE = 1024
 MAX_SEQNUM = 30720
 
@@ -35,8 +44,9 @@ def generatePacket(seqNum, ackNum, window, rest):
     return packet
 
 ##findValuesAfterCommas(buffer, result_b)
-#   This function is used to extract the data from the raw packet stored in buffer
+# This function is used to extract the data from the raw packet stored in buffer
 #and will store the output result in result_b.
+#
 def findValuesAfterCommas(buffer, result_b):
     #init local variables
     counter = 0
@@ -51,8 +61,9 @@ def findValuesAfterCommas(buffer, result_b):
     return result_b
 
 ##sendPacket(UDPSocket, packet, serverDirections)
-#   This function is used to send packets from the UDP Socket connection.
+# This function is used to send packets from the UDP Socket connection.
 #It sends the packet and informs of the sent packet
+##
 def sendPacket(UDPSocket, packet, serverDirections, seqNum, rest, lastWasTiemout):
     UDPSocket.sendto(packet, serverDirections)
 
@@ -73,10 +84,12 @@ def sendPacket(UDPSocket, packet, serverDirections, seqNum, rest, lastWasTiemout
             synchronization_notification = ""
 
     print("Sending packet [" + str(seqNum) + "] " + lastWasTiemout + acknowledgement_notification + synchronization_notification)
+
 ##listen(bytesAddressPair, UDPSocket, counter, address, seqNum, ackNum, window, rest)
-#   This function is used to listen to the UDP Socket the server binded to.
-#It also unpacks the data inside the packet calling some of the above declarated
+# This function is used to listen to the UDP Socket the server binded to.
+# It also unpacks the data inside the packet calling some of the above declarated
 #functions and will output the port of the client who sent the packet to the main program
+##
 def listen(UDPSocket, seqNum, ackNum, window, rest):
     #initialize local variables
     result_b, result = '', ''
@@ -113,12 +126,13 @@ def send_ack(seqNum, ackNum, window, rest):
 
 
 ##main()
-#   This is the main program that will run the execution of the UDP SERVER
+# This is the main program that will run the execution of the UDP SERVER
 #If first creates the UDP Server Socket, and then it enters in the section in which
-#the connection is stablished
+#the connection is stablished and the protocol interaction begins
+##
 if __name__ == "__main__":
      if len(sys.argv) != 3:
-          sys.exit("Usage: python simple-tcp-client.py SERVER-HOST-OR-IP PORT-NUMBER")
+          sys.exit("Usage: python3 client.py [SERVER-HOST-OR-IP] [PORT-NUMBER]")
      serverAddress = sys.argv[1]
      serverPort = int(sys.argv[2])
      serverDirections = (serverAddress, serverPort)
@@ -133,11 +147,12 @@ if __name__ == "__main__":
          print("There has been an error while managing your UDP Socket connection...")
          sys.exit(1)
 
-     #packet defined as a struct of bits
+     #packet defined as a struct of bits (represented as integers)
      seqNum, ackNum, window, rest = 0,0,0,0
-     #variable that counts the interations with the server
+     #global Global variables
      retransmission, lastWasTiemout = 0,0
 
+     #The connection will be iniciated once the client responds with a 'y'
      answ = input("Hey Alice! Would you like to connect to Bob's server? (y/other to exit connection\n")
      while(True):
          if(retransmission == 0):
@@ -149,8 +164,8 @@ if __name__ == "__main__":
                         sendPacket(UDPClientSocket, my_packet, serverDirections, seqNum, rest, lastWasTiemout)
                         if(lastWasTiemout != 0):
                             lastWasTiemout = 0
-                        #wait for response of the server
 
+                        #wait for the response of the server
                         try:
                             seqNum, ackNum, window, rest = listen(UDPClientSocket, seqNum, ackNum, window, rest)
                         except TimeoutError:
@@ -160,7 +175,7 @@ if __name__ == "__main__":
                             pass
                     case 1:
 
-                        #THEORETICAL TIMEOUT AFTER RECEIVING SIN/ACK
+                        #THEORETICAL TIMEOUT AFTER RECEIVING SIN/ACK TO CHECK TIMEOUT BEHAVIOR
                         #print("I am sleeping for 2 seconds...")
                         #time.sleep(3)
 
@@ -169,7 +184,7 @@ if __name__ == "__main__":
                         sendPacket(UDPClientSocket, my_packet, serverDirections, seqNum, rest, lastWasTiemout)
                         if(lastWasTiemout != 0):
                             lastWasTiemout = 0
-                        #DO NOT WAIT FOR RESPONSE OF SERVER, JUST ACK
+                        #DO NOT WAIT FOR RESPONSE OF SERVER, JUST ACK THE SYN/ACK
                     case _:
                         print("Connection to Bob's Server Succesfully Done")
                         sys.exit(1)
